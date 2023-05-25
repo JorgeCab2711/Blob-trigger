@@ -1,2 +1,0 @@
-# Blob-trigger
- 
