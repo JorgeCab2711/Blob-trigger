@@ -1,10 +1,10 @@
 import logging
 import azure.functions as func
 import pandas as pd
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-from azure.functions import get_app_setting
-
-
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+from azure.storage.blob import BlobServiceClient
+from io import StringIO
 
 
 COLORS = {
@@ -50,7 +50,7 @@ class TriggerProcessorHelper:
         
         return f"{first_sub_id}_{first_date_parts[2]}{first_date_parts[0]}_{first_met_id}.csv"
 
-    def groupIDs(self):
+    def groupIDsToBS(self):
         df = self.blob_DF
         stack = df['MeterId'].unique().tolist()
         while stack:
@@ -58,20 +58,42 @@ class TriggerProcessorHelper:
             filtered_df = df[df['MeterId'] == current_id]
             new_name = self.setNewBlobName(filtered_df)
             logging.info(f'\n{COLORS["YELLOW"]}--------------------------------------------------------------------------------------------------\n{COLORS["YELLOW"]}Uploading: {COLORS["RESET"]} {COLORS["GREEN"]} {new_name} {COLORS["RESET"]}\n{COLORS["YELLOW"]}Destination: {COLORS["RESET"]} : some blob \n{COLORS["YELLOW"]}--------------------------------------------------------------------------------------------------\n')
-            # TODO : Save file to blob storage
-            # filtered_df.to_csv(new_name, index=False)
- 
+            
+            # Getting the connection string from the key vault
+            vault_url = "https://triggertestkeyvault27.vault.azure.net/"
+            credential = DefaultAzureCredential()
+            secret_client = SecretClient(vault_url=vault_url, credential=credential)
+            secret_name = "connectionStringTest"
+            second_secret_name = 'cname'
+            secret = secret_client.get_secret(secret_name)
+            second_secret = secret_client.get_secret(second_secret_name)
+            connectionStringSecret = secret.value
+            containerNameSecret = second_secret.value
+
+            # using IO to save the DF to a StringIO object
+            csv_data = StringIO()
+            filtered_df.to_csv(csv_data, index=False)
+            csv_data.seek(0)
+
+            # Uploading data from to blob storage
+            
+            blob_service_client = BlobServiceClient.from_connection_string(connectionStringSecret)
+            blob_client = blob_service_client.get_blob_client(containerNameSecret, new_name)
+            blob_client.upload_blob(csv_data.getvalue(), overwrite=True)
+
+
     
 
 
 def main(myblob: func.InputStream):
-    
-    
-    
     helper = TriggerProcessorHelper(myblob)
-    helper.logInformation()
-    helper.groupIDs()
+    helper.groupIDsToBS()
 
+    
+
+
+
+    
 
 
     

@@ -9,7 +9,7 @@ pandas = "*"
 tabulate = "*"
 azure-storage-blob = "*"
 azure-identity = "*"
-os = "*"
+azure-keyvault-secrets = "*"
 
 [dev-packages]
 
